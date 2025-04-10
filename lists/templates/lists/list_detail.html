@@ -1,0 +1,433 @@
+{% extends 'lists/base.html' %}
+
+{% block content %}
+<div class="space-y-8">
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h1 class="text-2xl font-bold text-gray-800">{{ grocery_list.name }}</h1>
+            <div class="text-xl font-semibold text-gray-700">
+                Total: <span id="grandTotal">${{ grocery_list.total|default:"0.00" }}</span>
+            </div>
+        </div>
+
+        <div class="mb-6">
+            <form id="addItemForm" class="flex gap-2">
+                {% csrf_token %}
+                <input type="text" 
+                       name="name" 
+                       placeholder="Add item..." 
+                       class="flex-1 px-4 py-2 bg-secondary bg-opacity-30 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+                       required>
+                <button type="submit" 
+                        class="px-4 py-2 bg-accent text-white rounded-lg hover:bg-opacity-90 transition-colors">
+                    Add
+                </button>
+            </form>
+        </div>
+
+        <div id="itemsList" class="space-y-4">
+            {% for item in grocery_list.items.all %}
+            <div class="bg-white border rounded-lg p-4" data-item-id="{{ item.id }}">
+                <div class="flex items-center gap-4">
+                    <button onclick="togglePurchased({{ item.id }}, this)" 
+                            class="w-6 h-6 rounded border-2 border-accent flex items-center justify-center hover:bg-secondary transition-colors"
+                            {% if item.is_purchased %}data-purchased="true"{% endif %}>
+                        {% if item.is_purchased %}
+                        <svg class="w-4 h-4 text-accent" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
+                        </svg>
+                        {% endif %}
+                    </button>
+                    
+                    <span class="flex-1 {% if item.is_purchased %}line-through text-gray-500{% endif %}">
+                        {{ item.name }}
+                    </span>
+
+                    <button onclick="toggleUsed({{ item.id }}, this)"
+                            class="px-3 py-1 text-sm rounded-full {% if item.is_used %}bg-gray-500 text-white{% else %}bg-secondary text-gray-700{% endif %} hover:opacity-90 transition-colors"
+                            {% if item.is_used %}data-used="true"{% endif %}
+                            title="{% if item.is_used %}Used on {{ item.used_date|date:'M j, Y' }}{% else %}Mark as Used{% endif %}">
+                        {% if item.is_used %}Used{% else %}Not Used{% endif %}
+                    </button>
+
+                    <div class="flex items-center gap-2">
+                        <input type="number" 
+                               placeholder="Price" 
+                               step="0.01"
+                               class="w-24 px-2 py-1 border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+                               value="{{ item.price|default:'' }}"
+                               oninput="handlePriceQuantityChange({{ item.id }}, this, 'price')"
+                               {% if not item.is_purchased %}disabled{% endif %}>
+                        
+                        <input type="number" 
+                               placeholder="Qty" 
+                               class="w-16 px-2 py-1 border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+                               value="{{ item.quantity }}"
+                               oninput="handlePriceQuantityChange({{ item.id }}, this, 'quantity')"
+                               {% if not item.is_purchased %}disabled{% endif %}>
+                        
+                        <span class="w-24 text-right item-total">
+                            {% if item.total_price %}
+                            ${{ item.total_price }}
+                            {% else %}
+                            —
+                            {% endif %}
+                        </span>
+
+                        <button onclick="deleteItem({{ item.id }})"
+                                class="p-1 text-red-500 hover:text-red-700 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<template id="itemTemplate">
+    <div class="bg-white border rounded-lg p-4" data-item-id="">
+        <div class="flex items-center gap-4">
+            <button onclick="togglePurchased(this.closest('[data-item-id]').dataset.itemId, this)" 
+                    class="w-6 h-6 rounded border-2 border-accent flex items-center justify-center hover:bg-secondary transition-colors">
+            </button>
+            
+            <span class="flex-1"></span>
+
+            <button onclick="toggleUsed(this.closest('[data-item-id]').dataset.itemId, this)"
+                    class="px-3 py-1 text-sm rounded-full bg-secondary text-gray-700 hover:opacity-90 transition-colors"
+                    title="Mark as Used">
+                Not Used
+            </button>
+
+            <div class="flex items-center gap-2">
+                <input type="number" 
+                       placeholder="Price" 
+                       step="0.01"
+                       class="w-24 px-2 py-1 border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+                       oninput="handlePriceQuantityChange(this.closest('[data-item-id]').dataset.itemId, this, 'price')"
+                       disabled>
+                
+                <input type="number" 
+                       placeholder="Qty" 
+                       class="w-16 px-2 py-1 border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
+                       value="1"
+                       oninput="handlePriceQuantityChange(this.closest('[data-item-id]').dataset.itemId, this, 'quantity')"
+                       disabled>
+                
+                <span class="w-24 text-right item-total">—</span>
+
+                <button onclick="deleteItem(this.closest('[data-item-id]').dataset.itemId)"
+                        class="p-1 text-red-500 hover:text-red-700 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</template>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function updateItemUI(itemId, data) {
+        const itemDiv = document.querySelector(`[data-item-id="${itemId}"]`);
+        if (!itemDiv) return;
+
+        // Update item name
+        const nameSpan = itemDiv.querySelector('span:first-of-type');
+        if (nameSpan) {
+            nameSpan.textContent = data.name;
+            // Update the line-through class based on purchase status
+            if (data.is_purchased) {
+                nameSpan.classList.add('line-through', 'text-gray-500');
+            } else {
+                nameSpan.classList.remove('line-through', 'text-gray-500');
+            }
+        }
+
+        // Update purchase status
+        const purchaseBtn = itemDiv.querySelector('button[onclick*="togglePurchased"]');
+        if (purchaseBtn) {
+            if (data.is_purchased) {
+                purchaseBtn.setAttribute('data-purchased', 'true');
+                purchaseBtn.innerHTML = '<svg class="w-4 h-4 text-accent" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>';
+            } else {
+                purchaseBtn.removeAttribute('data-purchased');
+                purchaseBtn.innerHTML = '';
+            }
+        }
+
+        // Update used status
+        const usedBtn = itemDiv.querySelector('button[onclick*="toggleUsed"]');
+        if (usedBtn) {
+            if (data.is_used) {
+                usedBtn.setAttribute('data-used', 'true');
+                usedBtn.classList.remove('bg-secondary', 'text-gray-700');
+                usedBtn.classList.add('bg-gray-500', 'text-white');
+                usedBtn.textContent = 'Used';
+                if (data.used_date) {
+                    usedBtn.title = `Used on ${new Date(data.used_date).toLocaleDateString()}`;
+                }
+            } else {
+                usedBtn.removeAttribute('data-used');
+                usedBtn.classList.remove('bg-gray-500', 'text-white');
+                usedBtn.classList.add('bg-secondary', 'text-gray-700');
+                usedBtn.textContent = 'Not Used';
+                usedBtn.title = 'Mark as Used';
+            }
+        }
+
+        // Update price input
+        const priceInput = itemDiv.querySelector('input[placeholder="Price"]');
+        if (priceInput && data.price !== undefined) {
+            priceInput.value = data.price || '';
+            priceInput.disabled = !data.is_purchased;
+        }
+
+        // Update quantity input
+        const qtyInput = itemDiv.querySelector('input[placeholder="Qty"]');
+        if (qtyInput && data.quantity !== undefined) {
+            qtyInput.value = data.quantity || 1;
+            qtyInput.disabled = !data.is_purchased;
+        }
+
+        // Update item total
+        const totalSpan = itemDiv.querySelector('.item-total');
+        if (totalSpan) {
+            if (data.total) {
+                totalSpan.textContent = data.total;
+            } else if (data.price && data.quantity) {
+                const total = (parseFloat(data.price) * data.quantity).toFixed(2);
+                totalSpan.textContent = `$${total}`;
+            } else {
+                totalSpan.textContent = '—';
+            }
+        }
+
+        // Update grand total
+        if (data.list_total !== undefined) {
+            const grandTotal = document.getElementById('grandTotal');
+            if (grandTotal) {
+                grandTotal.textContent = `$${data.list_total}`;
+            }
+        }
+    }
+
+    async function deleteList(listId) {
+        if (!confirm('Are you sure you want to delete this list?')) {
+            return;
+        }
+        try {
+            const response = await fetch(`/list/${listId}/delete/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken,
+                },
+            });
+
+            if (response.ok) {
+                window.location.href = '{% url "lists:home" %}';
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    }
+
+    async function deleteItem(itemId) {
+        if (!confirm('Are you sure you want to delete this item?')) {
+            return;
+        }
+        try {
+            const response = await fetch(`/item/${itemId}/delete/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken,
+                },
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const itemDiv = document.querySelector(`[data-item-id="${itemId}"]`);
+                itemDiv.remove();
+                document.getElementById('grandTotal').textContent = data.list_total;
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    }
+
+    async function togglePurchased(itemId, button) {
+        const isPurchased = !button.hasAttribute('data-purchased');
+        
+        // Get the current item name before updating
+        const itemDiv = button.closest('[data-item-id]');
+        const nameSpan = itemDiv.querySelector('span:first-of-type');
+        const currentName = nameSpan ? nameSpan.textContent : '';
+        
+        try {
+            const response = await fetch(`/item/${itemId}/update/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken,
+                },
+                body: JSON.stringify({ is_purchased: isPurchased }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                
+                // Ensure the name is preserved in the response data
+                if (!data.name && currentName) {
+                    data.name = currentName;
+                }
+                
+                updateItemUI(itemId, data);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    }
+
+    async function toggleUsed(itemId, button) {
+        const isUsed = !button.hasAttribute('data-used');
+        
+        // Get the current item name before updating
+        const itemDiv = button.closest('[data-item-id]');
+        const nameSpan = itemDiv.querySelector('span:first-of-type');
+        const currentName = nameSpan ? nameSpan.textContent : '';
+        
+        try {
+            const response = await fetch(`/item/${itemId}/update/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken,
+                },
+                body: JSON.stringify({ is_used: isUsed }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                
+                // Ensure the name is preserved in the response data
+                if (!data.name && currentName) {
+                    data.name = currentName;
+                }
+                
+                updateItemUI(itemId, data);
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    }
+
+    let updateTimeout;
+    function handlePriceQuantityChange(itemId, input, field) {
+        // Clear any pending timeout
+        clearTimeout(updateTimeout);
+        
+        // Get both price and quantity values
+        const itemDiv = input.closest('[data-item-id]');
+        const priceInput = itemDiv.querySelector('input[placeholder="Price"]');
+        const qtyInput = itemDiv.querySelector('input[placeholder="Qty"]');
+        
+        // Find the total span using the new class
+        const totalSpan = itemDiv.querySelector('.item-total');
+        
+        // Update the total immediately with a temporary calculation
+        const price = parseFloat(priceInput.value) || 0;
+        const quantity = parseInt(qtyInput.value) || 0;
+        
+        // Only update if both values are valid and totalSpan exists
+        if (price && quantity && totalSpan) {
+            totalSpan.textContent = `$${(price * quantity).toFixed(2)}`;
+        } else if (totalSpan) {
+            totalSpan.textContent = '—';
+        }
+        
+        // Debounce the API call
+        updateTimeout = setTimeout(() => {
+            updateItem(itemId, {
+                price: priceInput.value || null,
+                quantity: qtyInput.value || 1
+            });
+        }, 300);
+    }
+
+    async function updateItem(itemId, fields) {
+        try {
+            // Get the current item name before updating
+            const itemDiv = document.querySelector(`[data-item-id="${itemId}"]`);
+            const nameSpan = itemDiv.querySelector('span:first-of-type');
+            const currentName = nameSpan ? nameSpan.textContent : '';
+            
+            const response = await fetch(`/item/${itemId}/update/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken,
+                },
+                body: JSON.stringify(fields),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                
+                // Ensure the name is preserved in the response data
+                if (!data.name && currentName) {
+                    data.name = currentName;
+                }
+                
+                // Always update the UI with the server response
+                updateItemUI(itemId, data);
+                
+                // Always update the grand total
+                if (data.list_total !== undefined) {
+                    document.getElementById('grandTotal').textContent = `$${data.list_total}`;
+                }
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    }
+
+    document.getElementById('addItemForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const name = form.querySelector('input[name="name"]').value;
+
+        try {
+            const response = await fetch(window.location.pathname, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': csrftoken,
+                },
+                body: `name=${encodeURIComponent(name)}`,
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const template = document.getElementById('itemTemplate');
+                const clone = template.content.cloneNode(true);
+                const itemDiv = clone.querySelector('[data-item-id]');
+                itemDiv.dataset.itemId = data.id;
+                itemDiv.querySelector('span:first-of-type').textContent = data.name;
+                document.getElementById('itemsList').appendChild(clone);
+                updateItemUI(data.id, data);
+                form.reset();
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    });
+</script>
+{% endblock %} 
