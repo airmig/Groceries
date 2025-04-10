@@ -40,7 +40,6 @@ docker-compose.yml
 .dockerignore
 
 # Local development
-.env
 .env.local
 *.sqlite3
 media/
