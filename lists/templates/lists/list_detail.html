@@ -54,10 +54,18 @@
                     
                     <div class="flex items-center gap-2">
                         <button onclick="toggleUsed({{ item.id }}, this)"
-                                class="px-2 py-1 text-xs rounded-full {% if item.is_used %}bg-gray-500 text-white{% else %}bg-secondary text-gray-700{% endif %} hover:opacity-90 transition-colors"
+                                class="p-1 rounded-full {% if item.is_used %}bg-green-100 text-green-600{% else %}bg-red-100 text-red-600{% endif %} hover:opacity-90 transition-colors"
                                 {% if item.is_used %}data-used="true"{% endif %}
                                 title="{% if item.is_used %}Used on {{ item.used_date|date:'M j, Y' }}{% else %}Mark as Used{% endif %}">
-                            {% if item.is_used %}Used{% else %}Not Used{% endif %}
+                            {% if item.is_used %}
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            {% else %}
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                            {% endif %}
                         </button>
 
                         <div class="flex items-center gap-1 ml-auto">
@@ -75,6 +83,14 @@
                                    value="{{ item.quantity }}"
                                    oninput="handlePriceQuantityChange({{ item.id }}, this, 'quantity')"
                                    {% if not item.is_purchased %}disabled{% endif %}>
+                            
+                            <button onclick="updateItemPrice({{ item.id }})"
+                                    class="p-1 text-accent hover:text-accent-dark transition-colors"
+                                    title="Update price">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                            </button>
                             
                             <span class="w-16 text-right text-sm item-total">
                                 {% if item.total_price %}
@@ -112,8 +128,11 @@
             
             <div class="flex items-center gap-2">
                 <button onclick="toggleUsed(this.closest('[data-item-id]').dataset.itemId, this)"
-                        class="px-2 py-1 text-xs rounded-full bg-secondary text-gray-700 hover:opacity-90 transition-colors">
-                    Not Used
+                        class="p-1 rounded-full bg-red-100 text-red-600 hover:opacity-90 transition-colors"
+                        title="Mark as Used">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
                 </button>
 
                 <div class="flex items-center gap-1 ml-auto">
@@ -130,6 +149,14 @@
                            value="1"
                            oninput="handlePriceQuantityChange(this.closest('[data-item-id]').dataset.itemId, this, 'quantity')"
                            disabled>
+                    
+                    <button onclick="updateItemPrice(this.closest('[data-item-id]').dataset.itemId)"
+                            class="p-1 text-accent hover:text-accent-dark transition-colors"
+                            title="Update price">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </button>
                     
                     <span class="w-16 text-right text-sm item-total">—</span>
                 </div>
@@ -174,17 +201,17 @@
         if (usedBtn) {
             if (data.is_used) {
                 usedBtn.setAttribute('data-used', 'true');
-                usedBtn.classList.remove('bg-secondary', 'text-gray-700');
-                usedBtn.classList.add('bg-gray-500', 'text-white');
-                usedBtn.textContent = 'Used';
+                usedBtn.classList.remove('bg-red-100', 'text-red-600');
+                usedBtn.classList.add('bg-green-100', 'text-green-600');
+                usedBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
                 if (data.used_date) {
                     usedBtn.title = `Used on ${new Date(data.used_date).toLocaleDateString()}`;
                 }
             } else {
                 usedBtn.removeAttribute('data-used');
-                usedBtn.classList.remove('bg-gray-500', 'text-white');
-                usedBtn.classList.add('bg-secondary', 'text-gray-700');
-                usedBtn.textContent = 'Not Used';
+                usedBtn.classList.remove('bg-green-100', 'text-green-600');
+                usedBtn.classList.add('bg-red-100', 'text-red-600');
+                usedBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
                 usedBtn.title = 'Mark as Used';
             }
         }
@@ -337,10 +364,9 @@
     }
 
     let updateTimeout;
+    let isUpdating = false;
+    
     function handlePriceQuantityChange(itemId, input, field) {
-        // Clear any pending timeout
-        clearTimeout(updateTimeout);
-        
         // Get both price and quantity values
         const itemDiv = input.closest('[data-item-id]');
         const priceInput = itemDiv.querySelector('input[placeholder="Price"]');
@@ -359,14 +385,28 @@
         } else if (totalSpan) {
             totalSpan.textContent = '—';
         }
+    }
+
+    async function updateItemPrice(itemId) {
+        const itemDiv = document.querySelector(`[data-item-id="${itemId}"]`);
+        if (!itemDiv) return;
+
+        const priceInput = itemDiv.querySelector('input[placeholder="Price"]');
+        const qtyInput = itemDiv.querySelector('input[placeholder="Qty"]');
+        const refreshButton = itemDiv.querySelector('button[onclick*="updateItemPrice"]');
         
-        // Debounce the API call
-        updateTimeout = setTimeout(() => {
-            updateItem(itemId, {
+        // Add visual feedback that update is in progress
+        refreshButton.classList.add('animate-spin');
+        
+        try {
+            await updateItem(itemId, {
                 price: priceInput.value || null,
                 quantity: qtyInput.value || 1
             });
-        }, 300);
+        } finally {
+            // Remove visual feedback
+            refreshButton.classList.remove('animate-spin');
+        }
     }
 
     async function updateItem(itemId, fields) {

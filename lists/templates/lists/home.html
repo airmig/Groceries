@@ -65,6 +65,7 @@
             <div class="bg-gray-50 rounded-lg p-4">
                 <h3 class="text-lg font-semibold text-primary mb-4">Price Trends</h3>
                 <select id="itemSelect" class="w-full p-2 border rounded-lg mb-4">
+                    <option value="">Select an item</option>
                     {% for item in stats.most_purchased %}
                     <option value="{{ item.name }}">{{ item.name }}</option>
                     {% endfor %}
@@ -135,6 +136,9 @@
     
     // Debug: Log the stats data to console
     console.log('Stats data:', stats);
+    console.log('Most purchased items:', stats.most_purchased);
+    console.log('Most purchased items type:', typeof stats.most_purchased);
+    console.log('Most purchased items length:', stats.most_purchased ? stats.most_purchased.length : 0);
     console.log('Weekdays:', weekdays);
     
     // Check if Chart.js is loaded
@@ -256,6 +260,21 @@
     
     if (trendChartEl && itemSelect) {
         function updateTrendChart(itemName) {
+            console.log('Updating trend chart for:', itemName);
+            console.log('Price trends data:', stats.price_trends);
+            
+            if (!itemName) {
+                console.log('No item selected');
+                trendChartEl.style.display = 'none';
+                return;
+            }
+            
+            if (!stats.price_trends || !stats.price_trends[itemName]) {
+                console.error('No price trends data for:', itemName);
+                trendChartEl.style.display = 'none';
+                return;
+            }
+            
             const trends = stats.price_trends[itemName];
             console.log('Price trends for', itemName, ':', trends);
             
@@ -263,6 +282,13 @@
                 trendChart.destroy();
             }
 
+            if (trends.length === 0) {
+                console.log('No trend data available for this item');
+                trendChartEl.style.display = 'none';
+                return;
+            }
+            
+            trendChartEl.style.display = 'block';
             trendChart = new Chart(trendChartEl, {
                 type: 'line',
                 data: {
@@ -288,14 +314,27 @@
             });
         }
 
+        // Add event listener for item selection
         itemSelect.addEventListener('change', (e) => {
+            console.log('Item selected:', e.target.value);
             updateTrendChart(e.target.value);
         });
 
-        // Initialize trend chart with first item
-        if (stats.most_purchased.length > 0) {
-            updateTrendChart(stats.most_purchased[0].name);
+        // Initialize trend chart with first item if available
+        if (stats.most_purchased && stats.most_purchased.length > 0) {
+            const firstItem = stats.most_purchased[0].name;
+            console.log('Initializing with first item:', firstItem);
+            itemSelect.value = firstItem;
+            updateTrendChart(firstItem);
+        } else {
+            console.log('No items available for price trends');
+            trendChartEl.style.display = 'none';
         }
+    } else {
+        console.error('Missing elements for price trends chart:', {
+            trendChartEl: !!trendChartEl,
+            itemSelect: !!itemSelect
+        });
     }
 </script>
 {% endblock %} 
